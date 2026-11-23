@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIOpenVC BP医生 诊断报告 · {{PROJECT_NAME}}</title>
+<style>
+  :root{
+    --ink:#1f2733; --sub:#4e5969; --muted:#8a94a3; --line:#e6e9ef;
+    --bg:#eff2f7; --card:#ffffff; --accent:#1A93C9;
+    /* 光谱六色：天蓝 → 绿 → 黄 → 橙 → 红 → 紫 */
+    --sp1:#1E9BD7; --sp2:#2AA36B; --sp3:#D2A01C; --sp4:#E0752A; --sp5:#C43A2E; --sp6:#7A2C86;
+    --brand-1:#0c3a52; --brand-2:#123f5e; --brand-3:#3c2a63;
+    --g-A:#1A93C9; --g-B:#28A067; --g-C:#C89112; --g-D:#D96B25; --g-E:#7A2C86;
+    --sec1:#1278A8; --sec2:#1B8A57; --sec3:#A87A12; --sec4:#C25E1E; --sec5:#A82E28; --sec6:#6B2573;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:15px; line-height:1.7; -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:20px 20px 64px}
+
+  /* 1. 顶部操作栏（打印隐藏） */
+  .action-bar{
+    position:sticky; top:0; z-index:50; display:flex; align-items:center; justify-content:space-between;
+    gap:16px; padding:10px 24px; background:rgba(12,42,58,.96); backdrop-filter:blur(8px);
+    border-bottom:1px solid rgba(255,255,255,.12); box-shadow:0 2px 12px rgba(0,0,0,.08);
+  }
+  .action-bar .brand-mini{color:#fff;font-size:13px;font-weight:600;letter-spacing:.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .action-bar .brand-mini b{color:#8ed4f2}
+  .btn-pdf{
+    flex:none; border:0; cursor:pointer; color:#fff; background:linear-gradient(135deg,#146F9E,#54307F);
+    padding:9px 18px; border-radius:9px; font-size:14px; font-weight:600; transition:.15s;
+    box-shadow:0 2px 8px rgba(20,111,158,.35);
+  }
+  .btn-pdf:hover{background:linear-gradient(135deg,#12608A,#472A6E)}
+  .btn-pdf:disabled{opacity:.6;cursor:wait}
+
+  /* 通栏标题：深色底 + 底部光谱饰条 */
+  .masthead{
+    background:linear-gradient(120deg,var(--brand-1) 0%,var(--brand-2) 58%,var(--brand-3) 130%);
+    color:#fff; border-radius:16px; padding:26px 30px 30px; margin-bottom:18px;
+    box-shadow:0 8px 28px rgba(12,42,58,.22); position:relative; overflow:hidden;
+  }
+  .masthead::before{
+    content:""; position:absolute; left:0; right:0; bottom:0; height:5px;
+    background:linear-gradient(90deg,var(--sp1) 0%,var(--sp2) 20%,var(--sp3) 40%,var(--sp4) 60%,var(--sp5) 80%,var(--sp6) 100%);
+  }
+  .masthead::after{
+    content:""; position:absolute; right:-60px; top:-70px; width:240px; height:240px;
+    border-radius:50%; background:radial-gradient(circle,rgba(255,255,255,.12),transparent 70%);
+  }
+  .masthead .mh-top{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap;position:relative;z-index:1}
+  .mh-title{font-size:clamp(22px,3vw,30px);font-weight:800;letter-spacing:.5px;line-height:1.25}
+  .mh-title .en{display:block;font-size:12px;font-weight:500;letter-spacing:2.5px;color:#9ecfe8;margin-top:4px}
+  .mh-date{text-align:right;font-size:13px;color:#d2e6f1;line-height:1.6;flex:none}
+  .mh-date .day{font-size:17px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums}
+  .mh-project{
+    margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.18);
+    font-size:14px;color:#e6f1f8;position:relative;z-index:1;
+  }
+  .mh-project b{color:#fff;font-weight:700}
+  .mh-tag{display:inline-block;margin-right:12px;padding:2px 10px;border-radius:999px;background:rgba(255,255,255,.14);font-size:12px}
+  .public-badge{
+    display:inline-block;margin-top:12px;padding:5px 14px;border-radius:999px;
+    background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.4);
+    font-size:12.5px;font-weight:600;color:#fff;letter-spacing:.5px;position:relative;z-index:1;
+  }
+
+  /* 2. 病情严重程度指示 */
+  .severity{
+    background:var(--card); border-radius:14px; padding:18px 22px; margin-bottom:18px;
+    box-shadow:0 4px 16px rgba(22,36,61,.06); border:1px solid var(--line);
+  }
+  .sev-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+  .sev-head .lbl{font-size:13px;font-weight:700;color:var(--sub);letter-spacing:1px}
+  .sev-verdict{font-size:16px;font-weight:800;color:var(--sev-color,#7A2C86)}
+  .sev-gauge{position:relative}
+  .sev-track{position:relative;padding-top:34px}
+  .sev-bar{position:relative;height:16px;border-radius:8px;
+    background:linear-gradient(90deg,var(--sp1) 0%,var(--sp2) 20%,var(--sp3) 40%,var(--sp4) 60%,var(--sp5) 80%,var(--sp6) 100%);
+    box-shadow:inset 0 1px 2px rgba(0,0,0,.12);overflow:hidden}
+  .sev-bar i{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.62)}
+  .sev-mark{position:absolute;top:0;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;z-index:2}
+  .sev-pill{background:#c0392b;color:#fff;font-size:12px;font-weight:800;padding:2px 10px;border-radius:999px;
+    white-space:nowrap;box-shadow:0 2px 6px rgba(192,57,43,.35);letter-spacing:.3px}
+  .sev-tip{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid #c0392b;margin-top:-1px}
+  .sev-scale{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:9px}
+  .sev-scale span{text-align:center;font-size:12px;color:var(--muted);line-height:1.35}
+  .sev-scale span em{display:block;font-style:normal;font-size:10.5px;color:#a3abba;letter-spacing:.2px}
+  .sev-scale span.on{font-weight:800}
+  .sev-scale span.on em{color:inherit;opacity:.78;font-weight:600}
+  .sev-desc{margin-top:12px;font-size:13.5px;color:var(--sub);line-height:1.6}
+
+  /* 3. 总分主视觉：左大分数 / 右一句话诊断，警示条通栏在下 */
+  .hero{
+    background:linear-gradient(135deg,#ffffff 0%,{{GRADE_TINT}} 100%);
+    border-radius:16px; padding:18px 32px 22px;
+    box-shadow:0 6px 24px rgba(22,36,61,.08); border:1px solid var(--line);
+    border-top:6px solid var(--grade-color,var(--g-B)); position:relative; overflow:hidden;
+  }
+  .hero::after{content:"";position:absolute;right:-50px;top:-50px;width:200px;height:200px;border-radius:50%;
+    background:radial-gradient(circle,{{GRADE_COLOR}}1c,transparent 70%);pointer-events:none}
+  .hero-main{display:grid;grid-template-columns:minmax(260px,320px) 1fr;gap:34px;align-items:center;position:relative;z-index:1}
+  /* 无标签，分值在左栏水平 + 垂直居中 */
+  .hero-score{text-align:center}
+  .score-line{display:flex;align-items:baseline;justify-content:center;gap:6px;margin:0}
+  .score{font-size:clamp(72px,12vw,140px);font-weight:800;line-height:1;color:var(--grade-color,var(--g-B));letter-spacing:-4px}
+  .score-den{font-size:clamp(20px,3vw,30px);color:var(--muted);font-weight:600}
+  .badge{display:inline-block;padding:6px 20px;border-radius:999px;font-size:16px;font-weight:700;color:#fff;background:var(--grade-color,var(--g-B))}
+  .ai-flag-inline{display:block;margin-top:8px;color:#C43A2E;font-weight:700;font-size:14px}
+  .hero-diag{border-left:1px solid var(--line);padding-left:34px;padding-top:4px}
+  .diag-head{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+  .diag-label{font-size:12px;letter-spacing:2px;color:var(--muted)}
+  .diagnosis{font-size:16.5px;font-weight:400;color:var(--ink);line-height:1.85;max-width:560px}
+  .diagnosis b,.diagnosis strong{font-weight:600}
+  .diagnosis .dx-tag{display:inline-block;margin-right:6px;padding:0 8px;border-radius:6px;background:#f1f4f9;color:#5b6b82;font-size:12px;font-weight:700;letter-spacing:.5px;vertical-align:2px}
+
+  /* 警示条：通栏，与总分卡片之间留出呼吸空间 */
+  .warning-area{display:grid;gap:10px;margin-top:24px}
+  .strip{width:100%;border-radius:12px;padding:14px 18px;font-size:14.5px;line-height:1.6;text-align:left}
+  .strip strong{display:block;font-size:15px;margin-bottom:2px}
+  .strip ul{margin:6px 0 0 18px}
+  .strip-redline{background:#fdf0ee;border:1px solid #f2c6bf;color:#a02a20}
+  .strip-info{background:#f0f6f4;border:1px solid #c9e3d8;color:#1b6b4d}
+  .strip-ai{background:linear-gradient(90deg,#C43A2E,#7A2C86);color:#fff}
+  .strip-ai strong{color:#fff}
+
+  /* 通用区块 */
+  .section{margin-top:30px}
+  .section h2{
+    font-size:20px;font-weight:800;margin:0 0 16px;padding:11px 18px;border-radius:10px;color:#fff;letter-spacing:.5px;
+    background:linear-gradient(100deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.17) 100%),var(--sc,var(--accent));
+    display:flex;align-items:center;gap:12px;box-shadow:0 3px 10px rgba(22,36,61,.10);
+  }
+  .section h2 .num{flex:none;width:29px;height:29px;border-radius:8px;background:rgba(255,255,255,.24);
+    display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:800}
+  .section h2 .hint{margin-left:auto;font-size:12px;font-weight:400;color:rgba(255,255,255,.85);text-align:right}
+
+  /* 评分总览：一行三段（名称+档位+分数 / 评分条 / 问题），窄屏不再挤碎 */
+  .overview{background:var(--card);border-radius:14px;padding:6px 20px;box-shadow:0 4px 16px rgba(22,36,61,.06)}
+  .ov-row{padding:15px 0;border-bottom:1px solid var(--line)}
+  .ov-row:last-child{border-bottom:0}
+  .ov-top{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+  .ov-name{font-weight:700;font-size:16px;letter-spacing:.2px}
+  .ov-tier{flex:none;font-size:11.5px;color:#fff;border-radius:5px;padding:1px 8px;font-weight:700;line-height:1.7}
+  .ov-score{margin-left:auto;flex:none;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .ov-score b{font-size:26px;font-weight:800;letter-spacing:-.5px}
+  .ov-score i{font-style:normal;font-size:13px;font-weight:600;color:var(--muted);margin-left:1px}
+  .bar-track{border-radius:999px;height:9px;overflow:hidden;
+    background:linear-gradient(90deg,rgba(30,155,215,.16),rgba(42,163,107,.16),rgba(210,160,28,.16),rgba(224,117,42,.16),rgba(196,58,46,.16),rgba(122,44,134,.16))}
+  .bar-fill{height:100%;border-radius:999px;min-width:3px}
+  .ov-problem{font-size:13.5px;color:var(--sub);line-height:1.65;margin-top:9px}
+
+  /* B 部分：BP 本体质量 · 满分起扣（只列已触发的减分项，红色） */
+  .bcard{background:var(--card);border-radius:14px;padding:20px 24px;box-shadow:0 4px 16px rgba(22,36,61,.06)}
+  .bcard-top{display:flex;align-items:center;gap:24px;padding-bottom:16px;border-bottom:1px dashed #e8d6d3;flex-wrap:wrap}
+  .bnum{display:flex;align-items:baseline;gap:3px;color:#C13A2E;flex:none;font-variant-numeric:tabular-nums}
+  .bnum span{font-size:52px;font-weight:800;line-height:1;letter-spacing:-1px}
+  .bnum i{font-style:normal;font-size:16px;font-weight:700;color:#b98a84}
+  .bmeta{flex:1;min-width:220px}
+  .bformula{font-size:15px;font-weight:700;color:var(--ink);letter-spacing:.2px}
+  .bformula em{font-style:normal;color:#C13A2E}
+  .brail{font-size:12px;color:var(--muted);margin-top:3px}
+  .bhint{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.6}
+  .bcomp{margin-top:12px;padding:10px 14px;border-radius:9px;background:#f4f7fb;border:1px solid #dfe7f1;
+    font-size:13.5px;color:#3d4a5c;font-weight:600;line-height:1.7}
+  .bcomp b{color:#1f2733;font-weight:800}
+  .bcomp .bcomp-t{white-space:nowrap;font-size:15px}
+  .bminus-t{display:flex;align-items:center;gap:8px;margin:16px 0 4px;font-size:13.5px;font-weight:800;letter-spacing:.8px;color:#C13A2E}
+  .bminus-t .cnt{margin-left:auto;font-weight:600;font-size:11.5px;color:var(--muted);letter-spacing:0}
+  .bminus-t .cnt b{color:#C13A2E}
+  .bminus-list{list-style:none;margin:0;padding:0}
+  .brow{display:flex;align-items:flex-start;gap:10px;padding:11px 0;border-bottom:1px dashed #f0dcd9;font-size:13.5px;line-height:1.6}
+  .brow:last-child{border-bottom:0}
+  .brow.empty{color:var(--muted);border-bottom:0}
+  .btag{flex:none;font-size:11.5px;font-weight:800;border-radius:5px;padding:2px 9px;color:#fff;background:#C13A2E;margin-top:2px;letter-spacing:.3px}
+  .btext{flex:1;color:var(--sub)}
+  .bps{flex:none;font-weight:800;font-size:15.5px;color:#C13A2E;font-variant-numeric:tabular-nums;margin-top:-1px}
+
+  /* 分维度卡片 */
+  .dim-card{background:var(--card);border-radius:14px;padding:22px 24px;margin-bottom:18px;
+    box-shadow:0 4px 16px rgba(22,36,61,.06);border-left:6px solid var(--tier-color,var(--g-B))}
+  .dim-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    padding-bottom:12px;border-bottom:2px solid var(--tier-color,var(--g-B))}
+  .dim-title{font-size:21px;font-weight:800;color:var(--tier-color,var(--g-B));letter-spacing:.5px;display:flex;align-items:center;gap:10px}
+  .dim-title .dt-dot{width:11px;height:11px;border-radius:50%;background:var(--tier-color,var(--g-B));flex:none}
+  .dim-meta{display:flex;align-items:center;gap:10px}
+  .dim-score{font-size:24px;font-weight:800;color:var(--tier-color,var(--g-B))}
+  .dim-tier{font-size:12.5px;color:#fff;border-radius:6px;padding:2px 10px;background:var(--tier-color,var(--g-B));font-weight:700}
+  .vtag{font-size:11.5px;color:var(--sub);background:#eef1f5;border-radius:5px;padding:2px 7px}
+  .vtag.warn{color:#a02a20;background:#fdf0ee}
+  .dim-block{margin-top:14px}
+  .blk-t{font-size:13px;font-weight:800;color:var(--sub);margin-bottom:6px;letter-spacing:.8px;display:flex;align-items:center;gap:6px}
+  .blk-t .k{font-size:11px;font-weight:700;color:#fff;background:#7a8699;border-radius:4px;padding:1px 7px;letter-spacing:.5px}
+  .evidence{background:#f4f7fb;border-radius:8px;padding:11px 13px;font-size:13.5px;color:var(--sub);line-height:1.65}
+  .q-list,.rx-list{margin:0;padding-left:0;list-style:none}
+  .q-list li{position:relative;padding:6px 0 6px 22px;font-size:13.5px;border-bottom:1px dashed var(--line)}
+  .q-list li:last-child{border-bottom:0}
+  .q-list li::before{content:"?";position:absolute;left:0;top:6px;width:16px;height:16px;border-radius:50%;
+    background:var(--g-A);color:#fff;font-size:11px;font-weight:700;text-align:center;line-height:16px}
+
+  /* 处方区：零容器——标题下方一条虚线，条目全平铺 */
+  .rx-zone{margin-top:22px;padding-top:0;border-top:0;background:none;border-radius:0}
+  .rx-band{text-align:center;margin-bottom:14px;padding-bottom:12px;border-bottom:2px dashed var(--rx-color,#7A2C86)}
+  .rx-band .rt{
+    display:inline-flex;align-items:center;gap:8px;background:var(--rx-color,#7A2C86);color:#fff;
+    font-size:12.5px;font-weight:800;letter-spacing:1.8px;padding:6px 20px;border-radius:999px;
+    box-shadow:0 2px 8px rgba(122,44,134,.20);
+  }
+  .rx-band .rt .rx-sym{font-family:Georgia,serif;font-size:14px;font-weight:800;opacity:.92}
+  .rx-item{padding:0;margin:0 0 16px;border:0}
+  .rx-item:last-child{margin-bottom:0}
+  .rx-h{font-weight:800;font-size:15px;margin-bottom:5px;color:#2b3240;display:flex;align-items:flex-start;gap:8px;line-height:1.55}
+  .rx-h .n{flex:none;display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;
+    background:var(--rx-color,#7A2C86);color:#fff;font-size:12px;margin-top:1px;font-weight:800}
+  .rx-line{font-size:13.5px;color:#4b5566;margin:2px 0 0;line-height:1.7;padding-left:30px}
+  .rx-line b{color:#33405a;font-weight:700}
+  .rx-line.pass,.rx-line .pass{color:#1B7A4E}
+  .rx-line.pass b,.rx-line .pass b{color:#1B7A4E}
+  .subscore{font-size:13px;color:var(--sub);margin-top:8px}
+  .subscore span{display:inline-block;margin-right:14px}
+
+  /* 列表块 */
+  .plain-list{background:var(--card);border-radius:14px;padding:16px 20px;box-shadow:0 4px 16px rgba(22,36,61,.06);list-style:none}
+  .plain-list li{padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .plain-list li:last-child{border-bottom:0}
+
+  /* 优先级 */
+  .prio-item{background:var(--card);border-radius:12px;padding:14px 18px;margin-bottom:12px;
+    box-shadow:0 4px 16px rgba(22,36,61,.06);display:flex;gap:14px;align-items:flex-start;
+    border-left:4px solid var(--pc,var(--accent))}
+  .prio-n{flex:none;width:30px;height:30px;border-radius:9px;background:var(--pc,var(--accent));color:#fff;
+    font-weight:800;display:flex;align-items:center;justify-content:center}
+  .prio-body{flex:1}
+  .prio-title{font-weight:700;font-size:15px}
+  .prio-impact{font-size:12.5px;color:#8a4a72;font-weight:600;margin-top:3px}
+
+  /* 页脚 */
+  .footer{margin-top:36px;padding:18px 22px;background:#ecebf3;border-radius:12px;font-size:12.5px;color:var(--sub);line-height:1.8}
+  .footer strong{color:var(--ink)}
+  .tech-credit{
+    margin-top:12px;padding-top:11px;border-top:1px dashed #cbc4da;text-align:center;
+    font-size:12.5px;font-weight:700;letter-spacing:.8px;color:#5a3f7a;
+  }
+
+  @media(max-width:900px){
+    .hero-main{grid-template-columns:1fr;gap:18px}
+    .hero-diag{border-left:0;border-top:1px solid var(--line);padding-left:0;padding-top:18px}
+  }
+  @media(max-width:620px){
+    .wrap{padding:14px 12px 48px}
+    .overview{padding:4px 15px}
+    .ov-name{font-size:15.5px}
+    .ov-score b{font-size:24px}
+    .bcard,.dim-card{padding:16px 16px}
+    .bnum span{font-size:42px}
+    .section h2{font-size:17.5px;padding:10px 14px;gap:9px}
+    .section h2 .hint{display:none}
+    .action-bar{padding:9px 12px;gap:10px}
+    .action-bar .brand-mini{font-size:12px}
+    .btn-pdf{padding:8px 13px;font-size:13px}
+    .masthead{padding:20px 18px 24px}
+    .sev-scale span{font-size:11px}
+    .sev-scale span em{font-size:9.5px}
+    .rx-line{padding-left:0}
+  }
+  @media print{
+    body{background:#fff}
+    .action-bar{display:none!important}
+    .wrap{max-width:none;padding:0}
+    .masthead{border-radius:0}
+    .hero,.overview,.bcard,.dim-card,.prio-item,.plain-list,.strip,.footer,.severity,.masthead{box-shadow:none!important;break-inside:avoid;page-break-inside:avoid}
+    .ov-row{break-inside:avoid;page-break-inside:avoid}
+    .section{break-before:auto}
+    .dim-card,.prio-item,.bcard{border:1px solid var(--line)}
+    @page{size:A4;margin:12mm}
+  }
+</style>
+</head>
+<body>
+<div class="action-bar" id="actionBar">
+  <div class="brand-mini"><b>AIOpenVC</b> · BP医生诊断报告 · {{PROJECT_NAME}}</div>
+  <button class="btn-pdf" id="btnPdf" onclick="exportPDF()">⬇ 下载 PDF</button>
+</div>
+
+<div class="wrap" id="report-body">
+
+  <!-- 通栏标题 -->
+  <header class="masthead">
+    <div class="mh-top">
+      <div class="mh-title">AIOpenVC BP医生 诊断报告
+        <span class="en">AIOPENVC BP DOCTOR · DIAGNOSTIC REPORT</span>
+      </div>
+      <div class="mh-date">
+        <div class="day">{{DATE}}</div>
+        <div>诊断日期 · Diagnostic Date</div>
+      </div>
+    </div>
+    <div class="mh-project"><span class="mh-tag">受诊项目</span><b>{{PROJECT_NAME}}</b></div>
+    {{PUBLIC_BADGE}}
+  </header>
+
+  <!-- 病情严重程度 -->
+  <div class="severity" style="--sev-color:{{SEV_COLOR}}">
+    <div class="sev-head">
+      <span class="lbl">病情严重程度 · SEVERITY</span>
+      <span class="sev-verdict">{{SEV_LABEL}} · {{GRADE}}</span>
+    </div>
+    <div class="sev-gauge">{{SEV_GAUGE}}</div>
+    <div class="sev-scale">{{SEV_SCALE}}</div>
+    <div class="sev-desc">{{SEV_DESC}}</div>
+  </div>
+
+  <!-- 总分主视觉：左侧分数，右侧等级 + 诊断结论 -->
+  <div class="hero" style="--grade-color:{{GRADE_COLOR}}">
+    <div class="hero-main">
+      <div class="hero-score">
+        <div class="score-line"><span class="score">{{TOTAL}}</span><span class="score-den">/ 100</span></div>
+        {{AI_INLINE}}
+      </div>
+      <div class="hero-diag">
+        <div class="diag-head"><span class="badge">{{GRADE}}</span><span class="diag-label">诊断结论 · DIAGNOSIS</span></div>
+        <div class="diagnosis">{{DIAGNOSIS}}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 警示条：通栏 -->
+  {{WARNING_STRIPS}}
+
+  <!-- 评分总览 -->
+  <div class="section" style="--sc:var(--sec1)">
+    <h2><span class="num">1</span>评分总览 <span class="hint">维度得分 0–100（百分制）· 档位 · 一句话问题</span></h2>
+    <div class="overview">{{OVERVIEW_ROWS}}</div>
+  </div>
+
+  <!-- B 部分：BP 本体质量 · 满分起扣，只列已触发的减分项 -->
+  <div class="section" style="--sc:var(--sec2)">
+    <h2><span class="num">2</span>BP 本体质量 · B 部分 <span class="hint">满分起扣 · 只列已触发的减分项</span></h2>
+    {{B_PART_BODY}}
+  </div>
+
+  <!-- 分维度诊断 -->
+  <div class="section" style="--sc:var(--sec3)">
+    <h2><span class="num">3</span>分维度诊断 <span class="hint">先诊断（依据 · 症状）后开方（℞ 处方）</span></h2>
+    {{DIMENSION_CARDS}}
+  </div>
+
+  <!-- 追问清单 -->
+  <div class="section" style="--sc:var(--sec4)">
+    <h2><span class="num">4</span>补充问诊 <span class="hint">按影响分数排序，未回答部分保留</span></h2>
+    {{FOLLOWUP_LIST}}
+  </div>
+
+  <!-- 处方优先级 -->
+  <div class="section" style="--sc:var(--sec5)">
+    <h2><span class="num">5</span>处方优先级 <span class="hint">疗效最大 + 成本最低者优先</span></h2>
+    {{PRIORITY_LIST}}
+  </div>
+
+  <!-- 外部核验汇总 -->
+  <div class="section" style="--sc:var(--sec6)">
+    <h2><span class="num">6</span>外部核验标记汇总 <span class="hint">仅公开信息抽查，不直接改分</span></h2>
+    {{VERIFICATION_LIST}}
+  </div>
+
+  <!-- 页脚声明（含技术支持落款，同属声明区） -->
+  <div class="footer">
+    <strong>声明</strong>：本病历是修改对照工具，不是投资建议；分数变化反映 BP 作为沟通工具的质量变化，不直接等同于项目投资价值；外部核验仅基于公开信息抽查，不构成尽调结论。
+    <div class="tech-credit">AIOpenVC 投研团队提供技术支持</div>
+  </div>
+
+</div>
+
+<script>
+function exportPDF(){
+  var btn=document.getElementById('btnPdf');
+  var old=btn.textContent;
+  btn.textContent='生成中…'; btn.disabled=true;
+  if (typeof html2pdf==='undefined'){
+    setTimeout(function(){ window.print(); btn.textContent=old; btn.disabled=false; },100);
+    return;
+  }
+  var el=document.getElementById('report-body');
+  var opt={
+    margin:[10,10,12,10],
+    filename:'{{PDF_FILENAME}}',
+    image:{type:'jpeg',quality:0.98},
+    html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},
+    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+    pagebreak:{mode:['css','legacy']}
+  };
+  html2pdf().set(opt).from(el).save().then(function(){
+    btn.textContent=old; btn.disabled=false;
+  }).catch(function(){
+    window.print(); btn.textContent=old; btn.disabled=false;
+  });
+}
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</body>
+</html>

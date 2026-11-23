@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{width:1280px;height:640px;overflow:hidden;
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:radial-gradient(circle at 76% 14%,#1E4C74 0%,#0F2438 46%,#0A1826 100%);
+    position:relative}
+  .grid{position:absolute;inset:0;opacity:.15;
+    background-image:linear-gradient(#4E7FA8 1px,transparent 1px),linear-gradient(90deg,#4E7FA8 1px,transparent 1px);
+    background-size:64px 64px}
+  .wrap{position:absolute;left:82px;top:132px;z-index:2;width:620px}
+  .kicker{font-size:16px;letter-spacing:6px;color:#7FA6C4;font-weight:600}
+  .t1{font-size:98px;line-height:1.02;color:#fff;font-weight:800;letter-spacing:3px;margin-top:20px}
+  .t1 em{font-style:normal;color:#4FC3A1}
+  .sub{font-size:27px;color:#B9D2E4;margin-top:26px;letter-spacing:1.5px}
+  .rule{width:74px;height:3px;background:#4FC3A1;margin-top:30px;border-radius:2px}
+  .tags{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap}
+  .tag{font-size:15px;color:#CFE3F0;border:1px solid rgba(160,200,225,.34);
+    border-radius:999px;padding:7px 17px;letter-spacing:1px}
+  .card{position:absolute;right:78px;top:130px;width:340px;z-index:2;
+    background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.14);
+    border-radius:22px;padding:34px 32px 30px;backdrop-filter:blur(2px)}
+  .card .cap{font-size:12px;letter-spacing:3px;color:#7FA6C4}
+  .card .n{font-size:104px;font-weight:800;color:#fff;line-height:1;margin-top:10px;
+    font-variant-numeric:tabular-nums;letter-spacing:-2px}
+  .card .n span{font-size:26px;color:#7FA6C4;font-weight:600;letter-spacing:0}
+  .card .g{font-size:16px;color:#E3B33C;letter-spacing:2px;margin-top:10px;font-weight:600}
+  .card .bar{position:relative;height:7px;border-radius:99px;margin-top:26px;
+    background:linear-gradient(90deg,#1E9BD7 0%,#2AA36B 24%,#D2A01C 47%,#E0752A 70%,#C43A2E 86%,#7A2C86 100%)}
+  .card .mk{position:absolute;left:61%;top:-16px;transform:translateX(-50%);text-align:center}
+  .card .mk i{display:block;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;
+    border-top:10px solid #E8590C;margin:0 auto}
+  .card .mk u{display:block;width:3px;height:16px;background:#fff;margin:0 auto;border-radius:2px}
+  .card .scale{display:flex;justify-content:space-between;margin-top:9px;font-size:11px;color:#7C9CB4;letter-spacing:1px}
+  .foot{position:absolute;left:82px;bottom:34px;font-size:14px;color:#6E92AD;letter-spacing:2.5px;z-index:2}
+  .foot2{position:absolute;right:82px;bottom:34px;font-size:14px;color:#6E92AD;letter-spacing:2.5px;z-index:2}
+</style></head>
+<body>
+  <div class="grid"></div>
+
+  <div class="wrap">
+    <div class="kicker">AIOpenVC · 开源工具</div>
+    <div class="t1">BP <em>医生</em></div>
+    <div class="sub">给商业计划书打分、找病灶、开处方</div>
+    <div class="rule"></div>
+    <div class="tags">
+      <div class="tag">100 分制</div>
+      <div class="tag">9 个维度</div>
+      <div class="tag">红线 −10</div>
+      <div class="tag">零依赖</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="cap">示例报告 · 虚构项目</div>
+    <div class="n">61<span> /100</span></div>
+    <div class="g">C 级 · 需大修</div>
+    <div class="bar">
+      <div class="mk"><i></i><u></u></div>
+    </div>
+    <div class="scale"><span>健康</span><span>轻度</span><span>中度</span><span>较重</span><span>危重</span></div>
+  </div>
+
+  <div class="foot">OPEN SOURCE · MIT LICENSE</div>
+  <div class="foot2">HTML 报告 + 结构化病历</div>
+</body>
+</html>

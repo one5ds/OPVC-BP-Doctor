@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIOpenVC BP医生 诊断报告 · 某工业机器人企业（示例）</title>
+<style>
+  :root{
+    --ink:#1f2733; --sub:#4e5969; --muted:#8a94a3; --line:#e6e9ef;
+    --bg:#eff2f7; --card:#ffffff; --accent:#1A93C9;
+    /* 光谱六色：天蓝 → 绿 → 黄 → 橙 → 红 → 紫 */
+    --sp1:#1E9BD7; --sp2:#2AA36B; --sp3:#D2A01C; --sp4:#E0752A; --sp5:#C43A2E; --sp6:#7A2C86;
+    --brand-1:#0c3a52; --brand-2:#123f5e; --brand-3:#3c2a63;
+    --g-A:#1A93C9; --g-B:#28A067; --g-C:#C89112; --g-D:#D96B25; --g-E:#7A2C86;
+    --sec1:#1278A8; --sec2:#1B8A57; --sec3:#A87A12; --sec4:#C25E1E; --sec5:#A82E28; --sec6:#6B2573;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:15px; line-height:1.7; -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:20px 20px 64px}
+
+  /* 1. 顶部操作栏（打印隐藏） */
+  .action-bar{
+    position:sticky; top:0; z-index:50; display:flex; align-items:center; justify-content:space-between;
+    gap:16px; padding:10px 24px; background:rgba(12,42,58,.96); backdrop-filter:blur(8px);
+    border-bottom:1px solid rgba(255,255,255,.12); box-shadow:0 2px 12px rgba(0,0,0,.08);
+  }
+  .action-bar .brand-mini{color:#fff;font-size:13px;font-weight:600;letter-spacing:.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .action-bar .brand-mini b{color:#8ed4f2}
+  .btn-pdf{
+    flex:none; border:0; cursor:pointer; color:#fff; background:linear-gradient(135deg,#146F9E,#54307F);
+    padding:9px 18px; border-radius:9px; font-size:14px; font-weight:600; transition:.15s;
+    box-shadow:0 2px 8px rgba(20,111,158,.35);
+  }
+  .btn-pdf:hover{background:linear-gradient(135deg,#12608A,#472A6E)}
+  .btn-pdf:disabled{opacity:.6;cursor:wait}
+
+  /* 通栏标题：深色底 + 底部光谱饰条 */
+  .masthead{
+    background:linear-gradient(120deg,var(--brand-1) 0%,var(--brand-2) 58%,var(--brand-3) 130%);
+    color:#fff; border-radius:16px; padding:26px 30px 30px; margin-bottom:18px;
+    box-shadow:0 8px 28px rgba(12,42,58,.22); position:relative; overflow:hidden;
+  }
+  .masthead::before{
+    content:""; position:absolute; left:0; right:0; bottom:0; height:5px;
+    background:linear-gradient(90deg,var(--sp1) 0%,var(--sp2) 20%,var(--sp3) 40%,var(--sp4) 60%,var(--sp5) 80%,var(--sp6) 100%);
+  }
+  .masthead::after{
+    content:""; position:absolute; right:-60px; top:-70px; width:240px; height:240px;
+    border-radius:50%; background:radial-gradient(circle,rgba(255,255,255,.12),transparent 70%);
+  }
+  .masthead .mh-top{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap;position:relative;z-index:1}
+  .mh-title{font-size:clamp(22px,3vw,30px);font-weight:800;letter-spacing:.5px;line-height:1.25}
+  .mh-title .en{display:block;font-size:12px;font-weight:500;letter-spacing:2.5px;color:#9ecfe8;margin-top:4px}
+  .mh-date{text-align:right;font-size:13px;color:#d2e6f1;line-height:1.6;flex:none}
+  .mh-date .day{font-size:17px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums}
+  .mh-project{
+    margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.18);
+    font-size:14px;color:#e6f1f8;position:relative;z-index:1;
+  }
+  .mh-project b{color:#fff;font-weight:700}
+  .mh-tag{display:inline-block;margin-right:12px;padding:2px 10px;border-radius:999px;background:rgba(255,255,255,.14);font-size:12px}
+  .public-badge{
+    display:inline-block;margin-top:12px;padding:5px 14px;border-radius:999px;
+    background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.4);
+    font-size:12.5px;font-weight:600;color:#fff;letter-spacing:.5px;position:relative;z-index:1;
+  }
+
+  /* 2. 病情严重程度指示 */
+  .severity{
+    background:var(--card); border-radius:14px; padding:18px 22px; margin-bottom:18px;
+    box-shadow:0 4px 16px rgba(22,36,61,.06); border:1px solid var(--line);
+  }
+  .sev-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+  .sev-head .lbl{font-size:13px;font-weight:700;color:var(--sub);letter-spacing:1px}
+  .sev-verdict{font-size:16px;font-weight:800;color:var(--sev-color,#7A2C86)}
+  .sev-gauge{position:relative}
+  .sev-track{position:relative;padding-top:34px}
+  .sev-bar{position:relative;height:16px;border-radius:8px;
+    background:linear-gradient(90deg,var(--sp1) 0%,var(--sp2) 20%,var(--sp3) 40%,var(--sp4) 60%,var(--sp5) 80%,var(--sp6) 100%);
+    box-shadow:inset 0 1px 2px rgba(0,0,0,.12);overflow:hidden}
+  .sev-bar i{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.62)}
+  .sev-mark{position:absolute;top:0;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;z-index:2}
+  .sev-pill{background:#c0392b;color:#fff;font-size:12px;font-weight:800;padding:2px 10px;border-radius:999px;
+    white-space:nowrap;box-shadow:0 2px 6px rgba(192,57,43,.35);letter-spacing:.3px}
+  .sev-tip{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid #c0392b;margin-top:-1px}
+  .sev-scale{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:9px}
+  .sev-scale span{text-align:center;font-size:12px;color:var(--muted);line-height:1.35}
+  .sev-scale span em{display:block;font-style:normal;font-size:10.5px;color:#a3abba;letter-spacing:.2px}
+  .sev-scale span.on{font-weight:800}
+  .sev-scale span.on em{color:inherit;opacity:.78;font-weight:600}
+  .sev-desc{margin-top:12px;font-size:13.5px;color:var(--sub);line-height:1.6}
+
+  /* 3. 总分主视觉：左大分数 / 右一句话诊断，警示条通栏在下 */
+  .hero{
+    background:linear-gradient(135deg,#ffffff 0%,#fdf6e4 100%);
+    border-radius:16px; padding:18px 32px 22px;
+    box-shadow:0 6px 24px rgba(22,36,61,.08); border:1px solid var(--line);
+    border-top:6px solid var(--grade-color,var(--g-B)); position:relative; overflow:hidden;
+  }
+  .hero::after{content:"";position:absolute;right:-50px;top:-50px;width:200px;height:200px;border-radius:50%;
+    background:radial-gradient(circle,#C891121c,transparent 70%);pointer-events:none}
+  .hero-main{display:grid;grid-template-columns:minmax(260px,320px) 1fr;gap:34px;align-items:center;position:relative;z-index:1}
+  /* 无标签，分值在左栏水平 + 垂直居中 */
+  .hero-score{text-align:center}
+  .score-line{display:flex;align-items:baseline;justify-content:center;gap:6px;margin:0}
+  .score{font-size:clamp(72px,12vw,140px);font-weight:800;line-height:1;color:var(--grade-color,var(--g-B));letter-spacing:-4px}
+  .score-den{font-size:clamp(20px,3vw,30px);color:var(--muted);font-weight:600}
+  .badge{display:inline-block;padding:6px 20px;border-radius:999px;font-size:16px;font-weight:700;color:#fff;background:var(--grade-color,var(--g-B))}
+  .ai-flag-inline{display:block;margin-top:8px;color:#C43A2E;font-weight:700;font-size:14px}
+  .hero-diag{border-left:1px solid var(--line);padding-left:34px;padding-top:4px}
+  .diag-head{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+  .diag-label{font-size:12px;letter-spacing:2px;color:var(--muted)}
+  .diagnosis{font-size:16.5px;font-weight:400;color:var(--ink);line-height:1.85;max-width:560px}
+  .diagnosis b,.diagnosis strong{font-weight:600}
+  .diagnosis .dx-tag{display:inline-block;margin-right:6px;padding:0 8px;border-radius:6px;background:#f1f4f9;color:#5b6b82;font-size:12px;font-weight:700;letter-spacing:.5px;vertical-align:2px}
+
+  /* 警示条：通栏，与总分卡片之间留出呼吸空间 */
+  .warning-area{display:grid;gap:10px;margin-top:24px}
+  .strip{width:100%;border-radius:12px;padding:14px 18px;font-size:14.5px;line-height:1.6;text-align:left}
+  .strip strong{display:block;font-size:15px;margin-bottom:2px}
+  .strip ul{margin:6px 0 0 18px}
+  .strip-redline{background:#fdf0ee;border:1px solid #f2c6bf;color:#a02a20}
+  .strip-info{background:#f0f6f4;border:1px solid #c9e3d8;color:#1b6b4d}
+  .strip-ai{background:linear-gradient(90deg,#C43A2E,#7A2C86);color:#fff}
+  .strip-ai strong{color:#fff}
+
+  /* 通用区块 */
+  .section{margin-top:30px}
+  .section h2{
+    font-size:20px;font-weight:800;margin:0 0 16px;padding:11px 18px;border-radius:10px;color:#fff;letter-spacing:.5px;
+    background:linear-gradient(100deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.17) 100%),var(--sc,var(--accent));
+    display:flex;align-items:center;gap:12px;box-shadow:0 3px 10px rgba(22,36,61,.10);
+  }
+  .section h2 .num{flex:none;width:29px;height:29px;border-radius:8px;background:rgba(255,255,255,.24);
+    display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:800}
+  .section h2 .hint{margin-left:auto;font-size:12px;font-weight:400;color:rgba(255,255,255,.85);text-align:right}
+
+  /* 评分总览：一行三段（名称+档位+分数 / 评分条 / 问题），窄屏不再挤碎 */
+  .overview{background:var(--card);border-radius:14px;padding:6px 20px;box-shadow:0 4px 16px rgba(22,36,61,.06)}
+  .ov-row{padding:15px 0;border-bottom:1px solid var(--line)}
+  .ov-row:last-child{border-bottom:0}
+  .ov-top{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+  .ov-name{font-weight:700;font-size:16px;letter-spacing:.2px}
+  .ov-tier{flex:none;font-size:11.5px;color:#fff;border-radius:5px;padding:1px 8px;font-weight:700;line-height:1.7}
+  .ov-score{margin-left:auto;flex:none;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .ov-score b{font-size:26px;font-weight:800;letter-spacing:-.5px}
+  .ov-score i{font-style:normal;font-size:13px;font-weight:600;color:var(--muted);margin-left:1px}
+  .bar-track{border-radius:999px;height:9px;overflow:hidden;
+    background:linear-gradient(90deg,rgba(30,155,215,.16),rgba(42,163,107,.16),rgba(210,160,28,.16),rgba(224,117,42,.16),rgba(196,58,46,.16),rgba(122,44,134,.16))}
+  .bar-fill{height:100%;border-radius:999px;min-width:3px}
+  .ov-problem{font-size:13.5px;color:var(--sub);line-height:1.65;margin-top:9px}
+
+  /* B 部分：BP 本体质量 · 满分起扣（只列已触发的减分项，红色） */
+  .bcard{background:var(--card);border-radius:14px;padding:20px 24px;box-shadow:0 4px 16px rgba(22,36,61,.06)}
+  .bcard-top{display:flex;align-items:center;gap:24px;padding-bottom:16px;border-bottom:1px dashed #e8d6d3;flex-wrap:wrap}
+  .bnum{display:flex;align-items:baseline;gap:3px;color:#C13A2E;flex:none;font-variant-numeric:tabular-nums}
+  .bnum span{font-size:52px;font-weight:800;line-height:1;letter-spacing:-1px}
+  .bnum i{font-style:normal;font-size:16px;font-weight:700;color:#b98a84}
+  .bmeta{flex:1;min-width:220px}
+  .bformula{font-size:15px;font-weight:700;color:var(--ink);letter-spacing:.2px}
+  .bformula em{font-style:normal;color:#C13A2E}
+  .brail{font-size:12px;color:var(--muted);margin-top:3px}
+  .bhint{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.6}
+  .bcomp{margin-top:12px;padding:10px 14px;border-radius:9px;background:#f4f7fb;border:1px solid #dfe7f1;
+    font-size:13.5px;color:#3d4a5c;font-weight:600;line-height:1.7}
+  .bcomp b{color:#1f2733;font-weight:800}
+  .bcomp .bcomp-t{white-space:nowrap;font-size:15px}
+  .bminus-t{display:flex;align-items:center;gap:8px;margin:16px 0 4px;font-size:13.5px;font-weight:800;letter-spacing:.8px;color:#C13A2E}
+  .bminus-t .cnt{margin-left:auto;font-weight:600;font-size:11.5px;color:var(--muted);letter-spacing:0}
+  .bminus-t .cnt b{color:#C13A2E}
+  .bminus-list{list-style:none;margin:0;padding:0}
+  .brow{display:flex;align-items:flex-start;gap:10px;padding:11px 0;border-bottom:1px dashed #f0dcd9;font-size:13.5px;line-height:1.6}
+  .brow:last-child{border-bottom:0}
+  .brow.empty{color:var(--muted);border-bottom:0}
+  .btag{flex:none;font-size:11.5px;font-weight:800;border-radius:5px;padding:2px 9px;color:#fff;background:#C13A2E;margin-top:2px;letter-spacing:.3px}
+  .btext{flex:1;color:var(--sub)}
+  .bps{flex:none;font-weight:800;font-size:15.5px;color:#C13A2E;font-variant-numeric:tabular-nums;margin-top:-1px}
+
+  /* 分维度卡片 */
+  .dim-card{background:var(--card);border-radius:14px;padding:22px 24px;margin-bottom:18px;
+    box-shadow:0 4px 16px rgba(22,36,61,.06);border-left:6px solid var(--tier-color,var(--g-B))}
+  .dim-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    padding-bottom:12px;border-bottom:2px solid var(--tier-color,var(--g-B))}
+  .dim-title{font-size:21px;font-weight:800;color:var(--tier-color,var(--g-B));letter-spacing:.5px;display:flex;align-items:center;gap:10px}
+  .dim-title .dt-dot{width:11px;height:11px;border-radius:50%;background:var(--tier-color,var(--g-B));flex:none}
+  .dim-meta{display:flex;align-items:center;gap:10px}
+  .dim-score{font-size:24px;font-weight:800;color:var(--tier-color,var(--g-B))}
+  .dim-tier{font-size:12.5px;color:#fff;border-radius:6px;padding:2px 10px;background:var(--tier-color,var(--g-B));font-weight:700}
+  .vtag{font-size:11.5px;color:var(--sub);background:#eef1f5;border-radius:5px;padding:2px 7px}
+  .vtag.warn{color:#a02a20;background:#fdf0ee}
+  .dim-block{margin-top:14px}
+  .blk-t{font-size:13px;font-weight:800;color:var(--sub);margin-bottom:6px;letter-spacing:.8px;display:flex;align-items:center;gap:6px}
+  .blk-t .k{font-size:11px;font-weight:700;color:#fff;background:#7a8699;border-radius:4px;padding:1px 7px;letter-spacing:.5px}
+  .evidence{background:#f4f7fb;border-radius:8px;padding:11px 13px;font-size:13.5px;color:var(--sub);line-height:1.65}
+  .q-list,.rx-list{margin:0;padding-left:0;list-style:none}
+  .q-list li{position:relative;padding:6px 0 6px 22px;font-size:13.5px;border-bottom:1px dashed var(--line)}
+  .q-list li:last-child{border-bottom:0}
+  .q-list li::before{content:"?";position:absolute;left:0;top:6px;width:16px;height:16px;border-radius:50%;
+    background:var(--g-A);color:#fff;font-size:11px;font-weight:700;text-align:center;line-height:16px}
+
+  /* 处方区：零容器——标题下方一条虚线，条目全平铺 */
+  .rx-zone{margin-top:22px;padding-top:0;border-top:0;background:none;border-radius:0}
+  .rx-band{text-align:center;margin-bottom:14px;padding-bottom:12px;border-bottom:2px dashed var(--rx-color,#7A2C86)}
+  .rx-band .rt{
+    display:inline-flex;align-items:center;gap:8px;background:var(--rx-color,#7A2C86);color:#fff;
+    font-size:12.5px;font-weight:800;letter-spacing:1.8px;padding:6px 20px;border-radius:999px;
+    box-shadow:0 2px 8px rgba(122,44,134,.20);
+  }
+  .rx-band .rt .rx-sym{font-family:Georgia,serif;font-size:14px;font-weight:800;opacity:.92}
+  .rx-item{padding:0;margin:0 0 16px;border:0}
+  .rx-item:last-child{margin-bottom:0}
+  .rx-h{font-weight:800;font-size:15px;margin-bottom:5px;color:#2b3240;display:flex;align-items:flex-start;gap:8px;line-height:1.55}
+  .rx-h .n{flex:none;display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;
+    background:var(--rx-color,#7A2C86);color:#fff;font-size:12px;margin-top:1px;font-weight:800}
+  .rx-line{font-size:13.5px;color:#4b5566;margin:2px 0 0;line-height:1.7;padding-left:30px}
+  .rx-line b{color:#33405a;font-weight:700}
+  .rx-line.pass,.rx-line .pass{color:#1B7A4E}
+  .rx-line.pass b,.rx-line .pass b{color:#1B7A4E}
+  .subscore{font-size:13px;color:var(--sub);margin-top:8px}
+  .subscore span{display:inline-block;margin-right:14px}
+
+  /* 列表块 */
+  .plain-list{background:var(--card);border-radius:14px;padding:16px 20px;box-shadow:0 4px 16px rgba(22,36,61,.06);list-style:none}
+  .plain-list li{padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .plain-list li:last-child{border-bottom:0}
+
+  /* 优先级 */
+  .prio-item{background:var(--card);border-radius:12px;padding:14px 18px;margin-bottom:12px;
+    box-shadow:0 4px 16px rgba(22,36,61,.06);display:flex;gap:14px;align-items:flex-start;
+    border-left:4px solid var(--pc,var(--accent))}
+  .prio-n{flex:none;width:30px;height:30px;border-radius:9px;background:var(--pc,var(--accent));color:#fff;
+    font-weight:800;display:flex;align-items:center;justify-content:center}
+  .prio-body{flex:1}
+  .prio-title{font-weight:700;font-size:15px}
+  .prio-impact{font-size:12.5px;color:#8a4a72;font-weight:600;margin-top:3px}
+
+  /* 页脚 */
+  .footer{margin-top:36px;padding:18px 22px;background:#ecebf3;border-radius:12px;font-size:12.5px;color:var(--sub);line-height:1.8}
+  .footer strong{color:var(--ink)}
+  .tech-credit{
+    margin-top:12px;padding-top:11px;border-top:1px dashed #cbc4da;text-align:center;
+    font-size:12.5px;font-weight:700;letter-spacing:.8px;color:#5a3f7a;
+  }
+
+  @media(max-width:900px){
+    .hero-main{grid-template-columns:1fr;gap:18px}
+    .hero-diag{border-left:0;border-top:1px solid var(--line);padding-left:0;padding-top:18px}
+  }
+  @media(max-width:620px){
+    .wrap{padding:14px 12px 48px}
+    .overview{padding:4px 15px}
+    .ov-name{font-size:15.5px}
+    .ov-score b{font-size:24px}
+    .bcard,.dim-card{padding:16px 16px}
+    .bnum span{font-size:42px}
+    .section h2{font-size:17.5px;padding:10px 14px;gap:9px}
+    .section h2 .hint{display:none}
+    .action-bar{padding:9px 12px;gap:10px}
+    .action-bar .brand-mini{font-size:12px}
+    .btn-pdf{padding:8px 13px;font-size:13px}
+    .masthead{padding:20px 18px 24px}
+    .sev-scale span{font-size:11px}
+    .sev-scale span em{font-size:9.5px}
+    .rx-line{padding-left:0}
+  }
+  @media print{
+    body{background:#fff}
+    .action-bar{display:none!important}
+    .wrap{max-width:none;padding:0}
+    .masthead{border-radius:0}
+    .hero,.overview,.bcard,.dim-card,.prio-item,.plain-list,.strip,.footer,.severity,.masthead{box-shadow:none!important;break-inside:avoid;page-break-inside:avoid}
+    .ov-row{break-inside:avoid;page-break-inside:avoid}
+    .section{break-before:auto}
+    .dim-card,.prio-item,.bcard{border:1px solid var(--line)}
+    @page{size:A4;margin:12mm}
+  }
+</style>
+</head>
+<body>
+<div class="action-bar" id="actionBar">
+  <div class="brand-mini"><b>AIOpenVC</b> · BP医生诊断报告 · 某工业机器人企业（示例）</div>
+  <button class="btn-pdf" id="btnPdf" onclick="exportPDF()">⬇ 下载 PDF</button>
+</div>
+
+<div class="wrap" id="report-body">
+
+  <!-- 通栏标题 -->
+  <header class="masthead">
+    <div class="mh-top">
+      <div class="mh-title">AIOpenVC BP医生 诊断报告
+        <span class="en">AIOPENVC BP DOCTOR · DIAGNOSTIC REPORT</span>
+      </div>
+      <div class="mh-date">
+        <div class="day">2026-11-23</div>
+        <div>诊断日期 · Diagnostic Date</div>
+      </div>
+    </div>
+    <div class="mh-project"><span class="mh-tag">受诊项目</span><b>某工业机器人企业（示例）</b></div>
+    <div class="public-badge">报告范本 · 虚构示例，仅示范版式与口径</div>
+  </header>
+
+  <!-- 病情严重程度 -->
+  <div class="severity" style="--sev-color:#C89112">
+    <div class="sev-head">
+      <span class="lbl">病情严重程度 · SEVERITY</span>
+      <span class="sev-verdict">中度 · C · 需大修</span>
+    </div>
+    <div class="sev-gauge"><div class="sev-track"><div class="sev-bar"><i style="left:20%"></i><i style="left:40%"></i><i style="left:60%"></i><i style="left:80%"></i></div><div class="sev-mark" style="left:57.2%"><div class="sev-pill">▼ 本项目 61 分 · 中度</div><div class="sev-tip"></div></div></div></div>
+    <div class="sev-scale"><span>健康<em>90–100 分</em></span><span>轻度<em>75–89 分</em></span><span class="on" style="color:#C89112">中度<em>60–74 分</em></span><span>较重<em>40–59 分</em></span><span>危重<em>0–39 分</em></span></div>
+    <div class="sev-desc">存在结构性缺陷或关键信息缺失，当前版本不宜直接递出，需一轮大修。</div>
+  </div>
+
+  <!-- 总分主视觉：左侧分数，右侧等级 + 诊断结论 -->
+  <div class="hero" style="--grade-color:#C89112">
+    <div class="hero-main">
+      <div class="hero-score">
+        <div class="score-line"><span class="score">61</span><span class="score-den">/ 100</span></div>
+        
+      </div>
+      <div class="hero-diag">
+        <div class="diag-head"><span class="badge">C · 需大修</span><span class="diag-label">诊断结论 · DIAGNOSIS</span></div>
+        <div class="diagnosis">体征：方向对口、团队底子扎实，属于可调治之症；但这份文档把「能力」写成了「成绩」——市场只有规模没有付费证据，壁垒只有自测数字，毛利结构与收入结构互相打架。不需要动项目本身，先把证据链补齐、把口径对上，一轮大修后可递交。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 警示条：通栏 -->
+  <div class="warning-area"><div class="strip strip-ai"><strong>AI 通道 · 局部 AI 痕迹 −3</strong><ul><li>P2 段首「随着智能制造的快速发展」，P6「在当前产业升级的大背景下」同类句式反复出现</li><li>P11 市场分析骨架为「首先—其次—再次」三段式，观点均匀铺开、无取舍</li><li>多处形容词密集而数字缺位（「显著提升」「大幅降低」「行业领先」均无量化）</li></ul></div></div>
+
+  <!-- 评分总览 -->
+  <div class="section" style="--sc:var(--sec1)">
+    <h2><span class="num">1</span>评分总览 <span class="hint">维度得分 0–100（百分制）· 档位 · 一句话问题</span></h2>
+    <div class="overview"><div class="ov-row"><div class="ov-top"><span class="ov-name">团队</span><span class="ov-tier" style="background:#28A067">良</span><span class="ov-score" style="color:#28A067"><b>80</b><i>/100</i></span></div><div class="bar-track"><div class="bar-fill" style="width:80%;background:#28A067"></div></div><div class="ov-problem">创始团队产业匹配度高，创始人有过 6 轴本体量产经验；但 CTO 与算法负责人均为兼职，全职核心只有三人，工程化能力存在缺口。</div></div>
+<div class="ov-row"><div class="ov-top"><span class="ov-name">市场与需求</span><span class="ov-tier" style="background:#C89112">中</span><span class="ov-score" style="color:#C89112"><b>60</b><i>/100</i></span></div><div class="bar-track"><div class="bar-fill" style="width:60%;background:#C89112"></div></div><div class="ov-problem">用整机市场规模论证需求，缺 SAM 收敛与付费证据分层；客户只给数量不给质量，订单能见度不足。</div></div>
+<div class="ov-row"><div class="ov-top"><span class="ov-name">宏观政策契合度</span><span class="ov-tier" style="background:#C89112">中</span><span class="ov-score" style="color:#C89112"><b>63</b><i>/100</i></span></div><div class="bar-track"><div class="bar-fill" style="width:63%;background:#C89112"></div></div><div class="ov-problem">方向对口（智能机器人属新兴支柱产业），但政策只停在名词层面，没有落到可申报的准入、补贴与时间窗口；出口管制与关键件断供风险未提。</div></div>
+<div class="ov-row"><div class="ov-top"><span class="ov-name">解决方案与壁垒</span><span class="ov-tier" style="background:#C89112">中</span><span class="ov-score" style="color:#C89112"><b>65</b><i>/100</i></span></div><div class="bar-track"><div class="bar-fill" style="width:65%;background:#C89112"></div></div><div class="ov-problem">力控与精度指标只有内部自测，无第三方检测或客户验收背书；壁垒停留在「算法自研」的表述上。</div></div>
+<div class="ov-row"><div class="ov-top"><span class="ov-name">商业模式</span><span class="ov-tier" style="background:#C89112">中</span><span class="ov-score" style="color:#C89112"><b>65</b><i>/100</i></span></div><div class="bar-track"><div class="bar-fill" style="width:65%;background:#C89112"></div></div><div class="ov-problem">毛利结构未拆解，系统集成收入占比上升会拉低整体毛利，但预测仍按本体毛利外推。</div></div>
+<div class="ov-row"><div class="ov-top"><span class="ov-name">竞品与替代</span><span class="ov-tier" style="background:#D96B25">差</span><span class="ov-score" style="color:#D96B25"><b>45</b><i>/100</i></span></div><div class="bar-track"><div class="bar-fill" style="width:45%;background:#D96B25"></div></div><div class="ov-problem">竞品只与国际四大家对位，遗漏国内同价位玩家与「客户现在用人工工位」这一真实替代；对比表无价格带，看不出会被谁抢单。</div></div>
+<div class="ov-row"><div class="ov-top"><span class="ov-name">融资与资金用途</span><span class="ov-tier" style="background:#C89112">中</span><span class="ov-score" style="color:#C89112"><b>60</b><i>/100</i></span></div><div class="bar-track"><div class="bar-fill" style="width:60%;background:#C89112"></div></div><div class="ov-problem">2 亿融资与里程碑不匹配，研发与产能的钱混在一起，估值缺对标口径。</div></div>
+<div class="ov-row"><div class="ov-top"><span class="ov-name">股权与控制权</span><span class="ov-tier" style="background:#28A067">良</span><span class="ov-score" style="color:#28A067"><b>70</b><i>/100</i></span></div><div class="bar-track"><div class="bar-fill" style="width:70%;background:#28A067"></div></div><div class="ov-problem">创始人直接持股偏低，期权池为零，回购条款只提了一句、细节缺失。</div></div>
+<div class="ov-row"><div class="ov-top"><span class="ov-name">风险自知</span><span class="ov-tier" style="background:#C89112">中</span><span class="ov-score" style="color:#C89112"><b>50</b><i>/100</i></span></div><div class="bar-track"><div class="bar-fill" style="width:50%;background:#C89112"></div></div><div class="ov-problem">通篇只有优势，没有风险页与关键假设清单，也没有下一验证节点。</div></div></div>
+  </div>
+
+  <!-- B 部分：BP 本体质量 · 满分起扣，只列已触发的减分项 -->
+  <div class="section" style="--sc:var(--sec2)">
+    <h2><span class="num">2</span>BP 本体质量 · B 部分 <span class="hint">满分起扣 · 只列已触发的减分项</span></h2>
+    <div class="bcard"><div class="bcard-top"><div class="bnum"><span>57</span><i>/100</i></div><div class="bmeta"><div class="bformula">满分 100 － 减分 <em>42.9</em> ＝ 57.1 / 100</div><div class="brail">原始 35 分制：35 － 15 ＝ 20 / 35</div><div class="bhint">B 部分满分起扣：只扣「这份文档本身」的问题（呈现、自洽、完整度），不重复扣项目质地；未触发的检查项不列出。</div></div></div><div class="bcomp">总分 ＝ A 部分 <b>63.5</b> / 100 × 65% ＋ B 部分 <b>57.1</b> / 100 × 35% ＝ <b class="bcomp-t">61 / 100</b></div><div class="bminus-t">已触发减分项 · DEDUCTIONS<span class="cnt">共 <b>5</b> 项 · 合计 <b>−42.9</b> / 100</span></div><ul class="bminus-list"><li class="brow"><span class="btag">逻辑</span><span class="btext">P20 毛利率 38% 与 P21「集成收入占比升至 45%」互相打架：集成毛利显著低于本体，占比上升后整体毛利不可能持平；P9 的行业规模与 P13 的在手订单口径未打通，读者接不上「行业很大」到「公司能拿多少」</span><span class="bps">−17.1</span></li><li class="brow"><span class="btag">排版</span><span class="btext">P22 客户案例为整页图片，文字不可检索复制；全文无页码，P24「详见前文对比」无法定位</span><span class="bps">−8.6</span></li><li class="brow"><span class="btag">表达</span><span class="btext">财务预测只给结果不给假设；P15 技术指标、P24 竞品对比两页均只有结论句，缺测量工况与出处</span><span class="bps">−5.7</span></li><li class="brow"><span class="btag">品牌</span><span class="btext">首屏未用一句话说清「做什么—卖给谁—凭什么是你」，读者要到 P6 才知道主营是协作机器人本体 + 力控方案</span><span class="bps">−2.9</span></li><li class="brow"><span class="btag">AI 味</span><span class="btext">命中 2 个信号（套话段首 + 三段式骨架），仍有人工痕迹（客户名、工况参数、失败复盘），判局部 AI 痕迹</span><span class="bps">−8.6</span></li></ul></div>
+  </div>
+
+  <!-- 分维度诊断 -->
+  <div class="section" style="--sc:var(--sec3)">
+    <h2><span class="num">3</span>分维度诊断 <span class="hint">先诊断（依据 · 症状）后开方（℞ 处方）</span></h2>
+    <div class="dim-card" style="--tier-color:#28A067"><div class="dim-head"><div class="dim-title"><span class="dt-dot"></span>团队</div><div class="dim-meta"><span class="vtag">🔍 可追溯（创始人履历与公开专利一致）</span><span class="dim-tier">良</span><span class="dim-score">80 / 100</span></div></div><div class="dim-block"><div class="blk-t"><span class="k">诊断</span>临床依据（BP 位置 / 原句）</div><div class="evidence">P4 团队页列 9 人：CTO 标注「某高校副教授（在职）」，算法负责人标注「兼职顾问，每周 2 天」，仅创始人、机械总监、销售总监为全职；P5 履历显示创始人曾在外资机器人企业负责 6 轴本体量产导入，与赛道匹配。全篇未说明兼职成员的投入时间、知识产归属与利益冲突处理。</div></div><div class="dim-block"><div class="blk-t"><span class="k">问诊</span>待核实要点</div><ul class="q-list"><li>CTO 是否已办理离岗或兼职审批？在校成果与公司专利的权属如何切分？</li><li>核心三人之外，控制器软件与量产工艺由谁负责？</li><li>兼职成员每周实际投入多少小时，是否有书面约定？</li></ul></div><div class="rx-zone" style="--rx-color:#28A067"><div class="rx-band"><span class="rt"><span class="rx-sym">℞</span>处方 · PRESCRIPTION</span></div><div class="rx-item"><div class="rx-h"><span class="n">1</span>补核心成员任职状态与权属切分表</div><div class="rx-line"><b>处方内容（改什么）：</b>把「谁在全职、谁在兼职、权属归谁」一次说清</div><div class="rx-line"><b>施治方法（怎么改）：</b>团队页加一列「任职状态 / 每周投入」，并为每位兼职成员附一份权属确认（高校或前雇主出具），同步说明其在公司担任的具体职责边界</div><div class="rx-line pass"><b>疗效标准（什么算过关）：</b>投资人能确认关键岗位有全职负责人，且公司专利不存在第三方主张风险</div></div><div class="rx-item"><div class="rx-h"><span class="n">2</span>补工程化能力的补位方案</div><div class="rx-line"><b>处方内容（改什么）：</b>承认缺口，给出补法而不是含糊带过</div><div class="rx-line"><b>施治方法（怎么改）：</b>列未来 6 个月要招的 3 个关键岗位（控制器软件、量产工艺、供应链），写明画像、到位月份、当前进展（已面到几轮）</div><div class="rx-line pass"><b>疗效标准（什么算过关）：</b>每个缺口对应一个人和一个时间点，不再出现「正在积极招聘」</div></div></div></div>
+<div class="dim-card" style="--tier-color:#C89112"><div class="dim-head"><div class="dim-title"><span class="dt-dot"></span>市场与需求</div><div class="dim-meta"><span class="vtag">无法验证（行业规模口径未找到同源公开数据）</span><span class="dim-tier">中</span><span class="dim-score">60 / 100</span></div></div><div class="dim-block"><div class="blk-t"><span class="k">诊断</span>临床依据（BP 位置 / 原句）</div><div class="evidence">P9 引用「2029 年全球协作机器人市场 120 亿美元」，无来源与口径，且未区分本体、核心部件、系统集成；P12 列 46 家客户 LOGO，仅 3 家给出金额；P13「在手订单 8,000 万元」未给交付月份与违约条款。</div></div><div class="dim-block"><div class="blk-t"><span class="k">问诊</span>待核实要点</div><ul class="q-list"><li>46 家客户中已量产交付、已复购、仅送样的各多少家？</li><li>在手订单的交付月份分布、验收条件与取消条款？</li><li>前五大客户收入占比与单一客户依赖度？</li></ul></div><div class="rx-zone" style="--rx-color:#C89112"><div class="rx-band"><span class="rt"><span class="rx-sym">℞</span>处方 · PRESCRIPTION</span></div><div class="rx-item"><div class="rx-h"><span class="n">1</span>把客户数量换成付费质量</div><div class="rx-line"><b>处方内容（改什么）：</b>从「46 家」变成「谁在付钱、付了多少、会不会再付」</div><div class="rx-line"><b>施治方法（怎么改）：</b>前十大客户列表：采购金额、首单时间、复购次数、验收状态；附一张 12 个月订单交付甘特图；客户名可脱敏但要保留行业与规模</div><div class="rx-line pass"><b>疗效标准（什么算过关）：</b>至少 5 家客户可核验付费与复购，客户集中度一眼看清</div></div><div class="rx-item"><div class="rx-h"><span class="n">2</span>补 TAM→SAM→SOM 三层收敛</div><div class="rx-line"><b>处方内容（改什么）：</b>把「行业很大」接到「公司能拿多少」</div><div class="rx-line"><b>施治方法（怎么改）：</b>TAM 用可核验来源并标报告名与年份；SAM 限定到公司可服务的 3C 精密装配与汽零装配场景及地域；SOM 按产能上限与已签客户反推三年可获得份额，每层给计算式</div><div class="rx-line pass"><b>疗效标准（什么算过关）：</b>投资人能沿三层漏斗一路算出公司三年营收，每一步有依据</div></div></div></div>
+<div class="dim-card" style="--tier-color:#C89112"><div class="dim-head"><div class="dim-title"><span class="dt-dot"></span>宏观政策契合度</div><div class="dim-meta"><span class="vtag">🔍 可追溯（政策文件与条款对应准确）</span><span class="dim-tier">中</span><span class="dim-score">63 / 100</span></div></div><div class="dim-block"><div class="blk-t"><span class="k">诊断</span>临床依据（BP 位置 / 原句）</div><div class="evidence">P18「受益于国家智能制造相关政策支持」，未列文件名称与适用条款；未提首台套、专精特新等可申报通道；P19 未说明减速器、伺服、力传感器的进口依赖与替代进度。</div></div><div class="subscore"><b>子项打分</b> &nbsp;<span>方向匹配：<b>80/100</b></span><span>政策论证质量：<b>50/100</b></span><span>顺风逆风判断：<b>60/100</b></span></div><div class="dim-block"><div class="blk-t"><span class="k">问诊</span>待核实要点</div><ul class="q-list"><li>已申报或计划申报哪些政策项目，进度如何？</li><li>关键部件的国产化率、双源供应是否已落地？</li><li>若出口管制加严，哪几个环节会直接卡住交付？</li></ul></div><div class="rx-zone" style="--rx-color:#C89112"><div class="rx-band"><span class="rt"><span class="rx-sym">℞</span>处方 · PRESCRIPTION</span></div><div class="rx-item"><div class="rx-h"><span class="n">1</span>做一页政策落地表</div><div class="rx-line"><b>处方内容（改什么）：</b>把「国家支持」换成可以申请的具体资源</div><div class="rx-line"><b>施治方法（怎么改）：</b>四列：政策文件全称与发布日期｜与协作机器人直接相关的适用条款｜公司可获得的准入/补贴/场景/采购机会｜申报或采购的时间窗口，至少填 3 条</div><div class="rx-line pass"><b>疗效标准（什么算过关）：</b>每条政策都能对应一项具体资源和一个截止日期</div></div><div class="rx-item"><div class="rx-h"><span class="n">2</span>补逆风与供应链预案</div><div class="rx-line"><b>处方内容（改什么）：</b>主动说明监管与供应风险，而不是只讲红利</div><div class="rx-line"><b>施治方法（怎么改）：</b>列减速器、伺服电机、六维力传感器的现有供应商、国产替代验证阶段（送样/小批/量产），并量化断供 3 个月对交付的影响</div><div class="rx-line pass"><b>疗效标准（什么算过关）：</b>关键部件有双源，断供影响可用台数与营收量化</div></div></div></div>
+<div class="dim-card" style="--tier-color:#C89112"><div class="dim-head"><div class="dim-title"><span class="dt-dot"></span>解决方案与壁垒</div><div class="dim-meta"><span class="vtag">无法验证（指标为内部测试，未见第三方报告）</span><span class="dim-tier">中</span><span class="dim-score">65 / 100</span></div></div><div class="dim-block"><div class="blk-t"><span class="k">诊断</span>临床依据（BP 位置 / 原句）</div><div class="evidence">P15「重复定位精度 ±0.02mm、力控分辨率 0.1N」标注「内部测试」，未写负载、工况与测量方法；P16 列专利 23 项（发明 9 项），未说明覆盖到哪一层技术；全篇无客户验收单或第三方报告。</div></div><div class="dim-block"><div class="blk-t"><span class="k">问诊</span>待核实要点</div><ul class="q-list"><li>精度指标在什么负载、什么节拍下测得？测试方法与设备是什么？</li><li>是否有第三方检测报告或客户验收单可脱敏提供？</li><li>专利是否覆盖核心力控算法与力传感器结构？</li></ul></div><div class="rx-zone" style="--rx-color:#C89112"><div class="rx-band"><span class="rt"><span class="rx-sym">℞</span>处方 · PRESCRIPTION</span></div><div class="rx-item"><div class="rx-h"><span class="n">1</span>把自测指标换成第三方证据</div><div class="rx-line"><b>处方内容（改什么）：</b>每个「领先」都要有出处，否则降级为目标值</div><div class="rx-line"><b>施治方法（怎么改）：</b>对精度、力控分辨率、节拍三项，各附检测报告或客户验收单（可脱敏），标注机构、工况、日期；暂无的改为「目标值 + 验证计划 + 时间点」</div><div class="rx-line pass"><b>疗效标准（什么算过关）：</b>所有「领先」表述有出处，或明确标注为待验证目标</div></div><div class="rx-item"><div class="rx-h"><span class="n">2</span>把壁垒拆成三层并各给证据</div><div class="rx-line"><b>处方内容（改什么）：</b>停止用「算法自研」一句话概括壁垒</div><div class="rx-line"><b>施治方法（怎么改）：</b>分数据（工艺参数库，给条数与来源）、部件（自研六维力传感器，给成本与精度对比）、场景（3C 装配的工装与节拍库，给复用次数）三层，各配一条可验证证据</div><div class="rx-line pass"><b>疗效标准（什么算过关）：</b>投资人能说清别人为什么 12 个月内追不上，且每层都有物证</div></div></div></div>
+<div class="dim-card" style="--tier-color:#C89112"><div class="dim-head"><div class="dim-title"><span class="dt-dot"></span>商业模式</div><div class="dim-meta"><span class="vtag">无法验证（无分线毛利数据）</span><span class="dim-tier">中</span><span class="dim-score">65 / 100</span></div></div><div class="dim-block"><div class="blk-t"><span class="k">诊断</span>临床依据（BP 位置 / 原句）</div><div class="evidence">P20 给出综合毛利率 38%，未拆本体 / 集成 / 服务三条线；P21 预测 2027 年集成收入占比由 22% 升至 45%，毛利率仍假设 38%，无解释；全篇无单位经济模型与敏感性分析。</div></div><div class="dim-block"><div class="blk-t"><span class="k">问诊</span>待核实要点</div><ul class="q-list"><li>本体、集成、服务三条线各自的毛利率与交付周期？</li><li>集成交付需要多少人月，人力成本如何计入毛利？</li><li>规模化后 BOM 能降多少，依据是什么？</li></ul></div><div class="rx-zone" style="--rx-color:#C89112"><div class="rx-band"><span class="rt"><span class="rx-sym">℞</span>处方 · PRESCRIPTION</span></div><div class="rx-item"><div class="rx-h"><span class="n">1</span>拆出单台单位经济模型</div><div class="rx-line"><b>处方内容（改什么）：</b>让 38% 这个数字可以被逐项还原</div><div class="rx-line"><b>施治方法（怎么改）：</b>以 20kg 负载机型为例列：售价 − BOM − 制造费用 − 渠道让利 − 服务成本 = 毛利，每一项标注「实际数据」或「假设」，实际数据附凭证</div><div class="rx-line pass"><b>疗效标准（什么算过关）：</b>投资人能自行加总得到 38%，且能看出哪个环节最脆弱</div></div><div class="rx-item"><div class="rx-h"><span class="n">2</span>重做三年预测的收入结构</div><div class="rx-line"><b>处方内容（改什么）：</b>让毛利假设与收入结构变化保持一致</div><div class="rx-line"><b>施治方法（怎么改）：</b>分线预测收入与毛利，集成按项目人力成本建模；再给敏感性：售价 ±10%、产能利用率 ±15%、集成毛利率 25%/35% 三档</div><div class="rx-line pass"><b>疗效标准（什么算过关）：</b>收入结构变化与毛利变化方向一致，且给出可承受的下限</div></div></div></div>
+<div class="dim-card" style="--tier-color:#D96B25"><div class="dim-head"><div class="dim-title"><span class="dt-dot"></span>竞品与替代</div><div class="dim-meta"><span class="vtag">🔍 可追溯（外资品牌参数与公开资料一致）</span><span class="dim-tier">差</span><span class="dim-score">45 / 100</span></div></div><div class="dim-block"><div class="blk-t"><span class="k">诊断</span>临床依据（BP 位置 / 原句）</div><div class="evidence">P24 对比表仅列 4 家外资品牌，参数取自官网，无价格带与实测对比；未列国内两家出货量领先的协作机器人厂商；未讨论客户继续用人工的切换成本与回本周期，也未出现任何被国内厂商抢单的复盘。</div></div><div class="dim-block"><div class="blk-t"><span class="k">问诊</span>待核实要点</div><ul class="q-list"><li>与国内同价位产品的实测差异与价差是多少？</li><li>客户从人工工位切换到机器人，回本周期几个月？</li><li>有没有被国内厂商以价格抢单的实际案例，怎么应对？</li></ul></div><div class="rx-zone" style="--rx-color:#D96B25"><div class="rx-band"><span class="rt"><span class="rx-sym">℞</span>处方 · PRESCRIPTION</span></div><div class="rx-item"><div class="rx-h"><span class="n">1</span>补全三档竞争地图</div><div class="rx-line"><b>处方内容（改什么）：</b>让读者看到真实的对手，而不只是对标的对手</div><div class="rx-line"><b>施治方法（怎么改）：</b>按国际品牌 / 国内头部 / 低价白牌三档列参数与价格带，并增加一行「客户现状：人工工位」，写明人工成本与节拍</div><div class="rx-line pass"><b>疗效标准（什么算过关）：</b>竞争地图覆盖真实对手，任何一档的价差都能解释来源</div></div><div class="rx-item"><div class="rx-h"><span class="n">2</span>算清客户的切换账</div><div class="rx-line"><b>处方内容（改什么）：</b>把「更柔性」翻译成客户能算的账</div><div class="rx-line"><b>施治方法（怎么改）：</b>选 3 个典型工位：人工成本 / 机器人投入（含集成与停机损失）/ 节拍与良率变化 / 回本周期，附客户实际数据</div><div class="rx-line pass"><b>疗效标准（什么算过关）：</b>至少 3 个案例回本周期 ≤ 18 个月，且数据来自客户而非测算</div></div></div></div>
+<div class="dim-card" style="--tier-color:#C89112"><div class="dim-head"><div class="dim-title"><span class="dt-dot"></span>融资与资金用途</div><div class="dim-meta"><span class="vtag">无法验证（未披露估值对标与股东跟投）</span><span class="dim-tier">中</span><span class="dim-score">60 / 100</span></div></div><div class="dim-block"><div class="blk-t"><span class="k">诊断</span>临床依据（BP 位置 / 原句）</div><div class="evidence">P28 融资 2 亿，用途写作「研发 40% / 产能 40% / 市场 20%」，未拆到项目与季度；P29 未给可比公司或近期交易的估值倍数；未说明现有股东是否跟投。</div></div><div class="dim-block"><div class="blk-t"><span class="k">问诊</span>待核实要点</div><ul class="q-list"><li>2 亿分别对应哪些可核验里程碑（台数、客户数、毛利）？</li><li>18 个月后账上现金与下一轮融资节点如何安排？</li><li>估值区间的锚是什么，与上一轮溢价理由？</li></ul></div><div class="rx-zone" style="--rx-color:#C89112"><div class="rx-band"><span class="rt"><span class="rx-sym">℞</span>处方 · PRESCRIPTION</span></div><div class="rx-item"><div class="rx-h"><span class="n">1</span>资金用途拆到可审计项</div><div class="rx-line"><b>处方内容（改什么）：</b>让每一笔钱都能对应一个交付物</div><div class="rx-line"><b>施治方法（怎么改）：</b>按「人员 / 设备 / 模具 / 认证 / 市场」列金额与季度，并在旁标注所支撑的里程碑（如「新增 2 条产线，2027Q1 达 3,000 台产能」）</div><div class="rx-line pass"><b>疗效标准（什么算过关）：</b>每项支出都能找到对应交付物与时间点，合计等于融资额</div></div><div class="rx-item"><div class="rx-h"><span class="n">2</span>给估值一个可对标的锚</div><div class="rx-line"><b>处方内容（改什么）：</b>把「拍出来的数」换成「算出来的区间」</div><div class="rx-line"><b>施治方法（怎么改）：</b>列 3–5 家可比公司或近 12 个月同类交易，给 PS/PE 区间，说明本项目折溢价的理由（增速、毛利、客户结构）</div><div class="rx-line pass"><b>疗效标准（什么算过关）：</b>估值落在可比区间内，溢价部分有可验证理由</div></div></div></div>
+<div class="dim-card" style="--tier-color:#28A067"><div class="dim-head"><div class="dim-title"><span class="dt-dot"></span>股权与控制权</div><div class="dim-meta"><span class="vtag">🔍 可追溯（股权结构与工商登记一致）</span><span class="dim-tier">良</span><span class="dim-score">70 / 100</span></div></div><div class="dim-block"><div class="blk-t"><span class="k">诊断</span>临床依据（BP 位置 / 原句）</div><div class="evidence">P30 股权表：创始人 31%、联合创始人 12%、机构合计 41%、员工持股平台 16%；期权池 0%；P31 提到「含回购条款」但未写触发条件、金额与责任主体。</div></div><div class="dim-block"><div class="blk-t"><span class="k">问诊</span>待核实要点</div><ul class="q-list"><li>员工持股平台 16% 中是否含代持，代持人是谁？</li><li>回购条款的触发条件、金额与责任主体？</li><li>本轮稀释并预留期权池后，创始人是否仍为实控人？</li></ul></div><div class="rx-zone" style="--rx-color:#28A067"><div class="rx-band"><span class="rt"><span class="rx-sym">℞</span>处方 · PRESCRIPTION</span></div><div class="rx-item"><div class="rx-h"><span class="n">1</span>补一张稀释后的控制权表</div><div class="rx-line"><b>处方内容（改什么）：</b>证明两轮稀释后创始团队仍能主导公司</div><div class="rx-line"><b>施治方法（怎么改）：</b>给出本轮 + 下一轮（含 10% 期权池）后的股权结构，说明一致行动安排或表决权设计，标出董事会席位分配</div><div class="rx-line pass"><b>疗效标准（什么算过关）：</b>稀释后创始人仍控制董事会多数席位，逻辑自洽</div></div><div class="rx-item"><div class="rx-h"><span class="n">2</span>披露回购条款全文要点</div><div class="rx-line"><b>处方内容（改什么）：</b>避免把潜在负债留到尽调才被发现</div><div class="rx-line"><b>施治方法（怎么改）：</b>写明触发条件（业绩/时点）、金额计算方式、责任主体（公司还是创始人）、是否已到期或豁免</div><div class="rx-line pass"><b>疗效标准（什么算过关）：</b>条款清晰可判，且不构成未被披露的隐性负债</div></div></div></div>
+<div class="dim-card" style="--tier-color:#C89112"><div class="dim-head"><div class="dim-title"><span class="dt-dot"></span>风险自知</div><div class="dim-meta"><span class="vtag">无法验证（BP 未披露）</span><span class="dim-tier">中</span><span class="dim-score">50 / 100</span></div></div><div class="dim-block"><div class="blk-t"><span class="k">诊断</span>临床依据（BP 位置 / 原句）</div><div class="evidence">38 页无「风险与应对」章节；财务预测未列前提取舍；未说明良率爬坡、客户验证周期、集成交付能力三项不确定性的应对。</div></div><div class="dim-block"><div class="blk-t"><span class="k">问诊</span>待核实要点</div><ul class="q-list"><li>目前最大的三个不确定性分别是什么？</li><li>各自用什么指标、在什么时间点验证？</li><li>如果良率停在 88%，商业模型还能成立吗？</li></ul></div><div class="rx-zone" style="--rx-color:#C89112"><div class="rx-band"><span class="rt"><span class="rx-sym">℞</span>处方 · PRESCRIPTION</span></div><div class="rx-item"><div class="rx-h"><span class="n">1</span>加一页「关键假设与反证指标」</div><div class="rx-line"><b>处方内容（改什么）：</b>主动告诉投资人这个故事在什么条件下不成立</div><div class="rx-line"><b>施治方法（怎么改）：</b>列 5 条关键假设（良率 92%、单客户复购、集成毛利 ≥25%、单台 BOM 年降 8%、交付周期 ≤45 天），每条配一个反证指标与观测时点</div><div class="rx-line pass"><b>疗效标准（什么算过关）：</b>投资人能看到失败条件，而不是只看到乐观路径</div></div><div class="rx-item"><div class="rx-h"><span class="n">2</span>给出 6 个月为单位的验证节点</div><div class="rx-line"><b>处方内容（改什么）：</b>把「未来可期」换成「什么时候能看到什么」</div><div class="rx-line"><b>施治方法（怎么改）：</b>按季度列里程碑与达成标准（台数、客户验收、毛利、良率），每项写清由谁负责、如何验证</div><div class="rx-line pass"><b>疗效标准（什么算过关）：</b>每个节点都有可核验的数字与责任人</div></div></div></div>
+  </div>
+
+  <!-- 追问清单 -->
+  <div class="section" style="--sc:var(--sec4)">
+    <h2><span class="num">4</span>补充问诊 <span class="hint">按影响分数排序，未回答部分保留</span></h2>
+    <ul class="plain-list"><li>三位兼职核心成员（CTO、算法负责人等）的实际投入时间、权属安排与利益冲突处理方式？</li><li>46 家客户中已复购的家数、复购金额占比，以及前五大客户集中度？</li><li>在手订单 8,000 万元的交付月份分布、验收条件与取消条款？</li><li>本体、集成、服务三条线各自的毛利率、交付周期与人力投入？</li><li>减速器、伺服电机、六维力传感器的供应商与国产替代验证进度？</li><li>2 亿融资对应的可核验里程碑（台数/客户/毛利）与 18 个月后的现金安排？</li><li>员工持股平台 16% 是否含代持？回购条款的触发条件与责任主体？</li><li>与国内同价位产品的实测差异、价差，以及客户切换的回本周期？</li></ul>
+  </div>
+
+  <!-- 处方优先级 -->
+  <div class="section" style="--sc:var(--sec5)">
+    <h2><span class="num">5</span>处方优先级 <span class="hint">疗效最大 + 成本最低者优先</span></h2>
+    <div class="prio-item" style="--pc:#C13A2E"><div class="prio-n">1</div><div class="prio-body"><div class="prio-title">先补「风险与关键假设」一页 + 6 个月验证节点</div><div class="prio-impact">预期疗效（分数影响）：风险自知 50 → 70，总分 +2~3；成本最低、见效最快（估计值，非承诺）</div></div></div>
+<div class="prio-item" style="--pc:#D96B25"><div class="prio-n">2</div><div class="prio-body"><div class="prio-title">客户与订单从数量改质量（付费、复购、交付节奏）</div><div class="prio-impact">预期疗效（分数影响）：市场与需求 60 → 75，总分 +3~4（估计值，非承诺）</div></div></div>
+<div class="prio-item" style="--pc:#C89112"><div class="prio-n">3</div><div class="prio-body"><div class="prio-title">拆单位经济模型，重做分线预测与敏感性</div><div class="prio-impact">预期疗效（分数影响）：商业模式 65 → 80，同时消掉 B 部分最大的逻辑扣分，总分 +4~5（估计值，非承诺）</div></div></div>
+<div class="prio-item" style="--pc:#28A067"><div class="prio-n">4</div><div class="prio-body"><div class="prio-title">自测指标换第三方证据，壁垒拆成三层</div><div class="prio-impact">预期疗效（分数影响）：解决方案与壁垒 65 → 75，总分 +2（估计值，非承诺）</div></div></div>
+<div class="prio-item" style="--pc:#1A93C9"><div class="prio-n">5</div><div class="prio-body"><div class="prio-title">补核心成员全职说明与权属切分表</div><div class="prio-impact">预期疗效（分数影响）：团队 75 → 85，总分 +2（估计值，非承诺）</div></div></div>
+  </div>
+
+  <!-- 外部核验汇总 -->
+  <div class="section" style="--sc:var(--sec6)">
+    <h2><span class="num">6</span>外部核验标记汇总 <span class="hint">仅公开信息抽查，不直接改分</span></h2>
+    <ul class="plain-list"><li>行业规模：BP 引用「2029 年 120 亿美元」未找到同口径公开来源，标注无法验证，已纳入追问。</li><li>专利数量：与国家知识产权局公开检索结果一致（23 项，发明 9 项），可追溯。</li><li>客户名单：抽查 3 家可在公开报道中对应，其余 43 家无法验证，建议提供可脱敏合同页。</li><li>竞品参数：所列 4 家外资品牌参数与官网公开资料一致；国内两家头部厂商未纳入对比。</li></ul>
+  </div>
+
+  <!-- 页脚声明（含技术支持落款，同属声明区） -->
+  <div class="footer">
+    <strong>声明</strong>：本病历是修改对照工具，不是投资建议；分数变化反映 BP 作为沟通工具的质量变化，不直接等同于项目投资价值；外部核验仅基于公开信息抽查，不构成尽调结论。
+    <div class="tech-credit">AIOpenVC 投研团队提供技术支持</div>
+  </div>
+
+</div>
+
+<script>
+function exportPDF(){
+  var btn=document.getElementById('btnPdf');
+  var old=btn.textContent;
+  btn.textContent='生成中…'; btn.disabled=true;
+  if (typeof html2pdf==='undefined'){
+    setTimeout(function(){ window.print(); btn.textContent=old; btn.disabled=false; },100);
+    return;
+  }
+  var el=document.getElementById('report-body');
+  var opt={
+    margin:[10,10,12,10],
+    filename:'BP诊断报告_范本_20261123.pdf',
+    image:{type:'jpeg',quality:0.98},
+    html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},
+    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+    pagebreak:{mode:['css','legacy']}
+  };
+  html2pdf().set(opt).from(el).save().then(function(){
+    btn.textContent=old; btn.disabled=false;
+  }).catch(function(){
+    window.print(); btn.textContent=old; btn.disabled=false;
+  });
+}
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</body>
+</html>
