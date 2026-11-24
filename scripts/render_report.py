@@ -63,18 +63,20 @@ TIER_RAMP = ["#1A93C9", "#28A067", "#C89112", "#D96B25", "#C13A2E"]
 B_MAX = 35.0
 
 # 病情严重程度：等级 -> (标签, 段号1-5, 颜色, 描述)；危重取光谱末端紫
+# 口径：70 分 = 合格（同行平均水平），因此「中度」对应的是「能看懂但需补证据」，不是「推倒重来」
 SEVERITY = {
     "A": ("健康", 1, "#1A93C9", "逻辑、证据、表达均达专业沟通水准，无结构性病灶，可直接递交投资人。"),
-    "B": ("轻度", 2, "#28A067", "核心逻辑成立，仅有少数局部问题，处理后即可递交。"),
-    "C": ("中度", 3, "#C89112", "存在结构性缺陷或关键信息缺失，当前版本不宜直接递出，需一轮大修。"),
-    "D": ("较重", 4, "#D96B25", "多个核心逻辑不成立，或 BP 本身质量存在严重问题，建议重构后再谈递交。"),
+    "B": ("轻度", 2, "#28A067", "核心成立，仅个别维度需补强或澄清，一两轮修改即可递出。"),
+    "C": ("中度", 3, "#C89112", "骨架完整、结论基本成立，但有证据缺口或局部口径不闭合，补齐后可递；不必推倒重来。"),
+    "D": ("较重", 4, "#D96B25", "存在结构性缺陷，多个核心逻辑站不住，需大修后再谈递交。"),
     "E": ("危重", 5, "#7A2C86", "无法完成让阅读者理解项目核心的基本任务，需从零重建 BP 的信息骨架。"),
 }
 SEV_LABELS = ["健康", "轻度", "中度", "较重", "危重"]
 SEV_COLORS = ["#1A93C9", "#28A067", "#C89112", "#D96B25", "#7A2C86"]
-# 五档对应的分数区间（与等级映射一致），用于刻度标注与箭头定位
-SEV_BANDS = [(90, 100), (75, 90), (60, 75), (40, 60), (0, 40)]
-SEV_RANGES = ["90–100", "75–89", "60–74", "40–59", "0–39"]
+# 五档对应的分数区间（与 scoring.md §1 等级映射严格一致），用于刻度标注与箭头定位
+# 校准基线：常规 BP 落在 68–77（C 段中位数 70），故 C 段是五档里唯一为「补齐即可」的区间
+SEV_BANDS = [(88, 100), (78, 88), (68, 78), (56, 68), (0, 56)]
+SEV_RANGES = ["88–100", "78–87", "68–77", "56–67", "0–55"]
 
 def severity_of(grade):
     return SEVERITY.get(grade_letter(grade), SEVERITY["B"])
@@ -133,16 +135,29 @@ def to_pct(score):
         return 0
 
 def tier_of(score):
+    """维度档位：阈值与总分等级区间同刻度（88/78/68/56 分），7.0 = 合格而非优秀。"""
     try:
         s = float(score)
     except (TypeError, ValueError):
         s = 0
-    if s >= 9: return "优", TIER_RAMP[0]
-    if s >= 7: return "良", TIER_RAMP[1]
-    if s >= 5: return "中", TIER_RAMP[2]
-    if s >= 3: return "差", TIER_RAMP[3]
-    if s >= 1: return "弱", TIER_RAMP[4]
+    if s >= 8.8: return "优", TIER_RAMP[0]
+    if s >= 7.8: return "良", TIER_RAMP[1]
+    if s >= 6.8: return "合格", TIER_RAMP[2]
+    if s >= 5.6: return "偏弱", TIER_RAMP[3]
+    if s >= 1: return "差", TIER_RAMP[4]
     return "缺项", "#8a94a3"
+
+def grade_of_total(total):
+    """总分 -> 等级字母，区间与 scoring.md §1 / SEV_BANDS 严格一致（88/78/68/56 分界）。"""
+    try:
+        t = float(total)
+    except (TypeError, ValueError):
+        t = 0
+    if t >= 88: return "A"
+    if t >= 78: return "B"
+    if t >= 68: return "C"
+    if t >= 56: return "D"
+    return "E"
 
 def grade_letter(grade):
     m = re.match(r"\s*([A-E])", grade or "")
@@ -413,6 +428,20 @@ def find_prev_record(outdir, short, suffix=""):
         return int(m.group(1)) if m else 0
     return max(files, key=ver) if files else None
 
+def scoring_version():
+    """从本技能 SKILL.md 的 frontmatter 读取版本号，作为病历的「标尺版本」。
+
+    评分口径一旦改动，新旧病历的分数就不在同一把尺子上；把版本号写进病历，
+    复诊时才能判断「分数变化」是真进步还是换尺子造成的。
+    """
+    try:
+        with open(os.path.join(HERE, "..", "SKILL.md"), "r", encoding="utf-8") as f:
+            head = f.read(1200)
+        m = re.search(r'^version:\s*"?([0-9]+\.[0-9]+\.[0-9]+)', head, re.M)
+        return m.group(1) if m else ""
+    except OSError:
+        return ""
+
 def parse_prev(path):
     if not path:
         return None
@@ -424,7 +453,8 @@ def parse_prev(path):
     grade = gm.group(1).strip() if gm else None
     scores = {}
     for line in txt.splitlines():
-        mm = re.match(r"^\|\s*([^|]+?)\s*\|\s*(\d+(?:\.\d+)?)\s*\|", line)
+        # 兼容两种表体：百分制「| 团队 | 80/100 | …」与旧口径「| 团队 | 8.0 | …」
+        mm = re.match(r"^\|\s*([^|]+?)\s*\|\s*(\d+(?:\.\d+)?)(?:\s*/\s*100)?\s*\|", line)
         if mm and mm.group(1).strip() not in ("维度", "---"):
             scores[mm.group(1).strip()] = float(mm.group(2))
     ver = 1
@@ -433,7 +463,9 @@ def parse_prev(path):
         ver = int(vm.group(1))
     # 百分制标记：新病历表头含「百分制」，旧病历为 0–10 制，对照时需 ×10 归一
     is_pct = "百分制" in txt
-    return {"total": total, "grade": grade, "scores": scores, "version": ver, "path": path, "pct": is_pct}
+    sm = re.search(r"标尺版本：v?([0-9]+\.[0-9]+\.[0-9]+)", txt)
+    return {"total": total, "grade": grade, "scores": scores, "version": ver,
+            "path": path, "pct": is_pct, "scale": (sm.group(1) if sm else None)}
 
 def prev_score_pct(prev, name):
     """把上一版维度分统一成百分制；旧版为 0–10 制则 ×10。"""
@@ -512,6 +544,7 @@ def render_md(d, prev):
         "{{PROJECT_SHORT}}": short,
         "{{DATE}}": date,
         "{{VERSION}}": str(newver),
+        "{{SCORING_VERSION}}": scoring_version() or "—",
         "{{PUBLIC_NOTE}}": (
             ("- 发布属性：**%s**，项目名 / 人名 / 机构名已按词表脱敏。\n" % d["_public_badge"])
             if d.get("_public_badge")
@@ -532,6 +565,8 @@ def render_md(d, prev):
 
     # 版本对照章节（百分制）
     if prev:
+        cur_scale = scoring_version()
+        comparable = bool(cur_scale) and prev.get("scale") == cur_scale
         cmp_rows = []
         for dm in d.get("dimensions") or []:
             name = dm.get("name", "")
@@ -539,23 +574,36 @@ def render_md(d, prev):
             old = prev_score_pct(prev, name)
             if old is None:
                 cmp_rows.append("| %s | — | %d/100 | 新增 | 新增 |" % (name, new))
+            elif not comparable:
+                # 跨标尺版本：分数不同源于尺子不同，不呈现涨跌，只留分数备查
+                cmp_rows.append("| %s | %d/100 | %d/100 | 不可比 | — |" % (name, old, new))
             else:
                 delta = new - old
                 sign = ("+%d" % delta) if delta > 0 else ("%d" % delta)
                 solved = "是" if delta >= 15 else ("部分" if delta > 0 else ("否" if delta == 0 else "倒退"))
                 cmp_rows.append("| %s | %d/100 | %d/100 | %s | %s |" % (name, old, new, sign, solved))
+
+        scale_note = ""
+        if not comparable:
+            scale_note = ("> ⚠ **标尺版本不同**（v%s → v%s）：两次诊断使用的评分口径不一致，"
+                          "分数与维度变化**不可直接比较**（下表「变化」列已置为不可比），"
+                          "只能核对「上一版的问题项是否已消除」。\n\n"
+                          % (prev.get("scale") or "未标注 · v1.1.0 之前", cur_scale or "当前"))
         oldt = prev["total"] if prev["total"] is not None else "—"
         dtot = total - prev["total"] if prev["total"] is not None else None
         dtot_s = ("+%d" % dtot) if (dtot is not None and dtot > 0) else (str(dtot) if dtot is not None else "—")
         unresolved = d.get("unresolved_high_priority") or ["见上一版优先级清单，逐条核对是否达标。"]
+        # 跨标尺时总分差同样不可比，改为并列展示
+        tot_line = ("总分：%s → %d（变化 %s）" % (oldt, total, dtot_s)) if comparable \
+            else ("总分：%s → %d（跨标尺版本，不计算变化）" % (oldt, total))
         block = (
-            "\n## 版本对照（v%d → v%d）\n"
+            "\n## 版本对照（v%d → v%d）\n%s"
             "| 维度 | 旧分 | 新分 | 变化 | 上一版核心问题是否解决 |\n"
             "|---|---|---|---|---|\n%s\n\n"
-            "总分：%s → %d（变化 %s）\n"
+            "%s\n"
             "等级：%s → %s\n"
             "**仍未解决的高优先级问题：**\n%s\n"
-            % (prev["version"], newver, "\n".join(cmp_rows), oldt, total, dtot_s,
+            % (prev["version"], newver, scale_note, "\n".join(cmp_rows), tot_line,
                prev["grade"] or "—", grade,
                "\n".join("%d. %s" % (i, x) for i, x in enumerate(unresolved, 1)))
         )
@@ -571,6 +619,17 @@ def main():
 
     with open(args.data, "r", encoding="utf-8") as f:
         d = json.load(f)
+
+    # 标尺一致性守卫：总分与 grade 字段必须落在同一区间，否则提示（不阻断渲染）
+    try:
+        exp = grade_of_total(d.get("total"))
+        if exp != grade_letter(d.get("grade")):
+            sys.stderr.write(
+                "⚠ 等级与总分不一致：总分 %s 应属 %s 级，JSON 写的是「%s」。请按 scoring.md §1 校正。\n"
+                % (d.get("total"), exp, d.get("grade")))
+    except Exception:
+        pass
+
     os.makedirs(args.outdir, exist_ok=True)
 
     suffix = ""

@@ -1,6 +1,7 @@
 # BP 病历 · {{PROJECT_SHORT}}
 - 诊断日期：{{DATE}}
 - 版本：v{{VERSION}}
+- 标尺版本：v{{SCORING_VERSION}}
 - 行业 / 项目类型 / 阶段 / BP 用途：{{META}}
 {{PUBLIC_NOTE}}
 
